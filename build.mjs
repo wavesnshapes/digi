@@ -44,6 +44,7 @@ console.log('built');
   html=rep(html,'<label class="opt"><input type="checkbox" id="oSess">','<label class="opt" hidden><input type="checkbox" id="oSess">');
   html=rep(html,'<label class="opt"><input type="checkbox" id="oTie">','<label class="opt" hidden><input type="checkbox" id="oTie">');
   html=rep(html,'digi.directory - companion','digi.directory - companion for OpenCode');
+  html=rep(html,'<label class="opt" hidden><input type="checkbox" id="oSess">','<label class="opt"><input type="checkbox" id="oChat"><span>Let it read my open chat<small id="oChatNote"></small></span></label>\n        <label class="opt" hidden><input type="checkbox" id="oSess">');
 
   js=rep(js,'const $=id=>document.getElementById(id);','const $=id=>root.getElementById(id);');
   js=rep(js,'const cv=$("cv"), vctx=cv.getContext("2d");','const cv=$("cv"), vctx=cv.getContext("2d"), hit=$("hit");');
@@ -62,8 +63,9 @@ console.log('built');
   js=rep(js,'document.addEventListener("keydown"','onDoc("keydown"');
   js=rep(js,'window.addEventListener("resize"','onWin("resize"');
   js=rep(js,'document.activeElement','root.activeElement');
-  // it starts in the bottom right corner, clear of the prompt
-  js=rep(js,'state.pos={x:(W-state.size)/2,y:(Hh-boxH())/2}','state.pos={x:W-state.size-28,y:Hh-boxH()-110}');
+  // it sits in the bottom right corner, and stays in that corner when the window changes size, until it is dragged somewhere
+  js=rep(js,'if(!state.pos)state.pos={x:(W-state.size)/2,y:(Hh-boxH())/2};','if(!state.pos||!state.moved)state.pos={x:W-state.size-6,y:Hh-boxH()-6};');
+  js=rep(js,'else{state.pos={x:drag.px+tx,y:drag.py+ty};placePet()}','else{state.moved=true;state.pos={x:drag.px+tx,y:drag.py+ty};placePet()}');
   // no first screen to get through: one hatches, and the generator is a click or /digi away
   js=rep(js,'if(state.seed!==null){setDigi(state.seed);$("pet").hidden=false}else openPicker();',
     'let hatched=false;if(state.seed===null){const s0=newSeed();state.seed=s0;state.hist=[s0];save();hatched=true}\nsetDigi(state.seed);$("pet").hidden=!!state.hidden;if(hatched)sayLine("click me. drag me",false);');
@@ -72,6 +74,7 @@ console.log('built');
   js=rep(js,"WHERE YOU ARE: you live in a small window on your owner's desktop as a companion, not in a battle.","WHERE YOU ARE: you float inside your owner's OpenCode window, the app they write code in with an AI, as a companion, not in a battle.");
   js=rep(js,'"Its lines come from Claude on your account and show on its face. Off: it only uses its stock phrases."','"Its lines are written by the model your session is set to, and that costs what that model costs. Off: it only uses its stock phrases."');
   js=rep(js,'"Here it floats inside this page. Installed as an app, it floats on top of your screen with no window around it."','"It floats inside the OpenCode window. Drag it by its body. Type /digi to come back here."');
+  js=rep(js,'let out="WORLD CONTEXT\\nLocal time: "+clock()+".";','let out="WORLD CONTEXT\\nLocal time: "+clock()+".";\n  if(state.chat){const c=chatExcerpt();if(c)out+="\\n\\nTHE CHAT YOUR OWNER HAS OPEN WITH THEIR CODING AI RIGHT NOW (latest messages, trimmed). Talk about what they are doing in it:\\n"+c}\n  if(turnHint){out+="\\n\\n"+turnHint;turnHint=""}');
   // the part that waits for Claude's own app features is replaced by the wrapper's ending
   const tail=js.indexOf('// capabilities arrive later');if(tail<0)throw new Error('app.html: missing the capabilities block');
   js=js.slice(0,tail);
