@@ -19,17 +19,19 @@ let widgetOn=false, wm=freshState({}), wTick=0;
 // vector drawing stands in for it. The desktop app starts on the vector drawing unless floating was chosen.
 let clientBroken=false, onDesktop=false, paneOpen=false, paneSvg=false, pm=freshState({}), pmSeed=-1, faultNoted=false;
 // The desktop app draws the vector version only: the cell drawing needs an element it may not have.
-function markDesktop(e){if(e&&e.surface==="desktop"&&!onDesktop){onDesktop=true;seat().catch(()=>{})}}
+
 const sess={turns:0,tools:0,fails:0,turnTools:0,turnFails:0,turnStart:0,byTool:{},lastPrompt:"",lastTurn:""};
 
 const rnd=a=>a[Math.floor(Math.random()*a.length)];
 const randSeed=()=>Math.floor(Math.random()*4294967296)>>>0;
 const redact=s=>String(s||"").replace(/[A-Za-z0-9_\-+/=]{24,}/g,"[redacted]").replace(/\s+/g," ").trim();
 const modeNow=()=>{
-  if(clientBroken||onDesktop)return "widget";
+  if(clientBroken)return "widget";
   if(cfg.mode==="float"||cfg.mode==="widget")return cfg.mode;
-  return onDesktop?"widget":opt.mode;
+  return opt.mode;
 };
+// what this app actually did with the floating view, for /digi debug
+const diag={beside:0,besideBy:{},float:null,client:null,drew:0,faults:[],paneBy:{},version:"",surfaces:""};
 const sizeNow=()=>cfg.size==="large"||cfg.size==="small"?cfg.size:opt.size;
 const speakNow=()=>typeof cfg.speak==="boolean"?cfg.speak:opt.speak;
 const watchNow=()=>typeof cfg.watch==="boolean"?cfg.watch:opt.watch;
@@ -219,10 +221,11 @@ export function register(on,options){
     if(cfg.seed===null||cfg.seed===undefined){setDigi(randSeed());hatched=true;save()}else setDigi(cfg.seed);
     $.clock.every(1000,()=>{beat().catch(()=>{})});
     $.clock.every(125,()=>{widgetTick()});
-    try{await $.command.register({name:"digi",description:"Your digi companion: pick one, make it talk, switch between floating and the widget",argumentHint:"[pick|talk|move|new|float|widget|hide|show]",immediate:true})}catch(err){}
+    try{await $.command.register({name:"digi",description:"Your digi companion: pick one, make it talk, switch between floating and the widget",argumentHint:"[pick|talk|move|new|float|widget|hide|show|debug]",immediate:true})}catch(err){}
     if(hatched)$.ui.toast(d.name+" hatched in your session. Run /digi to pick a different one.");
-    try{onDesktop=JSON.stringify(await $.session.surfaces()).includes("desktop")}catch(err){}
-    if(onDesktop)seat().catch(()=>{});
+    try{diag.surfaces=JSON.stringify(await $.session.surfaces());onDesktop=diag.surfaces.includes("desktop")}catch(err){diag.surfaces="error: "+String(err&&err.message||err).slice(0,80)}
+    try{diag.version=JSON.stringify(await $.session.version())}catch(err){}
+    seat().catch(()=>{});
     return next(e);
   });
 
@@ -239,6 +242,17 @@ export function register(on,options){
     }
     if(a==="size small"||a==="size large"||a==="small"||a==="large"){cfg.size=a.endsWith("large")?"large":"small";save();redraw();return {}}
     if(a==="new"){setDigi(randSeed());save();redraw();return {text:"Your digi is now "+d.name+", a "+RARITY[d.rar]+" "+d.type+" type."}}
+    if(a==="debug"){
+      let now="";try{now=JSON.stringify(await $.session.surfaces())}catch(err){now="error"}
+      return {text:["digi debug (paste this back):",
+        "plugin 0.3.2, Claude Code "+diag.version,
+        "surfaces at start "+diag.surfaces+", now "+now,
+        "view setting: "+modeNow()+" (saved "+cfg.mode+", option "+opt.mode+"), hidden "+cfg.hidden+", widget seated "+widgetOn+", cell drawing failed "+clientBroken,
+        "beside-prompt spot asked "+diag.beside+" times "+JSON.stringify(diag.besideBy)+", room "+JSON.stringify(diag.float),
+        "floating element available: "+diag.client+", floating digi drawn "+diag.drew+" times",
+        "pane drawn "+JSON.stringify(diag.paneBy),
+        "faults: "+(diag.faults.length?diag.faults.join(" | "):"none")].join("\n")};
+    }
     if(a==="close"||(a===""&&paneOpen)){paneOpen=false;await closeUi().catch(()=>{});return {}}
     await openPane();
     return {};
@@ -246,10 +260,13 @@ export function register(on,options){
 
   // Floating: from a cell of no width beside the prompt, over the whole area above it. Blank parts pass the pointer on.
   on("ui.render",{component:"BesidePrompt"},async($,e,next)=>{
-    markDesktop(e);
-    if(!d||cfg.hidden||widgetOn||e.surface==="desktop"||modeNow()!=="float")return next(e);
+    diag.beside++;diag.besideBy[e.surface]=(diag.besideBy[e.surface]||0)+1;
+    diag.float={columns:e.props.floatColumns,rows:e.props.floatRows,max:e.props.maxColumns};
+    if(!d||cfg.hidden||widgetOn||modeNow()!=="float")return next(e);
     const el=$.ui.resolve(e), cols=e.props.floatColumns|0, rws=e.props.floatRows|0;
+    diag.client=!!el.Client;
     if(!el.Client||cols<16||rws<6)return next(e);
+    diag.drew++;
     return el.Box({width:0,height:1,children:[
       el.Box({position:"absolute",anchor:"above",right:0,bottom:0,width:cols,height:rws,children:[
         el.Client({key:"digi",module:"./sprite.js",width:cols,height:rws,props:spriteProps()})
@@ -262,7 +279,6 @@ export function register(on,options){
       const el=$.ui.resolve(e);
       if(!d)return next(e);
       if(!el.Svg)return el.Text({children:[d.name+" needs the desktop app for this view. Run /digi float."]});
-      markDesktop(e);
       const big=e.props.placement!=="widget";
       return el.Box({flexDirection:"column",alignItems:"center",children:[
         el.Svg({source:svgFrame(d,wm,big?320:176),alt:d.name+", your digi"+(wm.speech?", saying: "+wm.speech.text:""),width:big?320:176}),
@@ -274,7 +290,7 @@ export function register(on,options){
       ]});
     }
     if(e.requestId!==PANE)return next(e);
-    paneOpen=true;markDesktop(e);
+    paneOpen=true;diag.paneBy[e.surface]=(diag.paneBy[e.surface]||0)+1;
     const {Box,Text,Button,Client,Svg}=$.ui.resolve(e);
     if(!cands.length)deal();
     const c=cands[ci], mine=d&&c.seed===d.seed;
@@ -309,7 +325,7 @@ export function register(on,options){
       Text({children:[" "]}),
       Text({bold:true,children:["Settings"]}),
       Box({flexDirection:"row",columnGap:1,children:[
-        onDesktop?Text({dimColor:true,children:["View: widget (floating needs the terminal)"]}):Button({key:"view",label:"View: "+(modeNow()==="widget"?"widget":"floating"),onPress:()=>{cfg.mode=modeNow()==="widget"?"float":"widget";if(cfg.mode==="float")clientBroken=false;save();seat().catch(()=>{});redraw()}}),
+        Button({key:"view",label:"View: "+(modeNow()==="widget"?"widget":"floating"),onPress:()=>{cfg.mode=modeNow()==="widget"?"float":"widget";if(cfg.mode==="float")clientBroken=false;save();seat().catch(()=>{});redraw()}}),
         Button({key:"size",label:"Size: "+sizeNow(),onPress:()=>{cfg.size=sizeNow()==="small"?"large":"small";save();redraw()}}),
         flip("shown","Shown",!cfg.hidden,()=>{cfg.hidden=!cfg.hidden})
       ]}),
@@ -325,6 +341,7 @@ export function register(on,options){
 
   // the cell drawing failed on this surface: the vector drawing takes over
   on("ui.fault",async($,e,next)=>{
+    diag.faults.push(String(e.element)+" on "+String(e.surface)+" ("+String(e.phase||"?")+"): "+String(e.reason||"").slice(0,200));if(diag.faults.length>4)diag.faults.shift();
     if(e.element==="digi"||e.element==="preview"){
       clientBroken=true;
       if(!faultNoted){faultNoted=true;toast("This app can't run the floating digi yet, so it moved to the widget view.")}

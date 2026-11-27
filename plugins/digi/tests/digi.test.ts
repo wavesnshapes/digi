@@ -92,10 +92,14 @@ describe('digi', () => {
     await ui.unmount()
   })
 
-  test('the desktop app starts on the widget', async ($, on) => {
-    const { opened } = world(on, {}, ['desktop'])
+  test('debug reports what the app did with the floating view', async ($, on) => {
+    world(on, {}, ['desktop'])
+    on('session.version', () => ({ value: '2.1.332' }))
     await $.session.start({ cwd: '/work' } as never)
-    expect(JSON.stringify(opened)).toContain('widget')
+    const ui = await $.ui.mount({ plugin: 'digi', surface: 'desktop', component: 'BesidePrompt', props: CELL as never })
+    const out: any = await $.command.run({ command: 'digi', args: 'debug' } as never)
+    expect(out.text).toContain('floating digi drawn 1 times')
+    await ui.unmount()
   })
 
   test('the widget draws a vector digi on the desktop app', async ($, on) => {
