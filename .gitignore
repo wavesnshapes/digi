@@ -1,0 +1,9 @@
+# macOS and Windows clutter
+.DS_Store
+Thumbs.db
+
+# Claude Code writes type declarations here when you load the plugin with --plugin-dir
+plugins/digi/.claude-plugin/types/
+
+# in case you ever add dependencies
+node_modules/

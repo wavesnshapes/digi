@@ -1,0 +1,17 @@
+{
+  "name": "digi-directory",
+  "owner": {
+    "name": "wavesnshapes",
+    "url": "https://github.com/wavesnshapes"
+  },
+  "metadata": {
+    "description": "digi, a companion for Claude Code from digi.directory"
+  },
+  "plugins": [
+    {
+      "name": "digi",
+      "source": "./plugins/digi",
+      "description": "A digi companion that floats in your Claude Code session, reacts to how it is going and talks back"
+    }
+  ]
+}

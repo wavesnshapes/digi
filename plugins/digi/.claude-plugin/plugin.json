@@ -1,0 +1,56 @@
+{
+  "name": "digi",
+  "version": "0.2.0",
+  "description": "A digi companion that floats in your Claude Code session, reacts to how it is going and talks back",
+  "author": {
+    "name": "wavesnshapes",
+    "url": "https://x.com/wavesnshapes"
+  },
+  "homepage": "https://digi.directory",
+  "keywords": [
+    "companion",
+    "pet",
+    "mod",
+    "digi"
+  ],
+  "userConfig": {
+    "view": {
+      "type": "string",
+      "title": "View",
+      "description": "\"float\": it floats over the session and you drag it anywhere. \"widget\": a sharper drawing with the glow and colour split, in a corner widget of the desktop app, which cannot be dragged. The /digi float and /digi widget commands switch it too.",
+      "required": false,
+      "default": "float",
+      "options": [
+        "float",
+        "widget"
+      ]
+    },
+    "size": {
+      "type": "string",
+      "title": "Size when floating",
+      "description": "\"small\" or \"large\".",
+      "required": false,
+      "default": "small",
+      "options": [
+        "small",
+        "large"
+      ]
+    },
+    "claudeVoice": {
+      "type": "boolean",
+      "title": "Claude writes its lines",
+      "description": "On: a small Claude model speaks for your digi, on your own plan. Off: it only uses its stock phrases.",
+      "required": false,
+      "default": true
+    },
+    "sessionComments": {
+      "type": "boolean",
+      "title": "Comments on your session",
+      "description": "On: its lines can mention how the session is going: turns, tool calls, failures and the last thing you typed.",
+      "required": false,
+      "default": true
+    }
+  },
+  "license": "MIT",
+  "repository": "https://github.com/wavesnshapes/digi"
+}
