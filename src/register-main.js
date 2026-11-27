@@ -6,7 +6,7 @@ const PANE="digi", WIDGET="digi-widget";
 const STARS=["","*","***","****","******"];
 const FIGHT=["stop poking me","you want some of this","i have moves and i will use them","hands off the screen","this is a fight now","en garde human","poke me again. i dare you","that was your last click"];
 // The mods API is only ever spelled out inside a hook, so the first hook fills these in for everything else to call.
-let ready=false, redraw=()=>{}, save=()=>{}, nowMs=async()=>0, complete=async()=>null, openUi=async()=>null, openWidget=async()=>null, closeWidget=async()=>null, toast=()=>{};
+let ready=false, redraw=()=>{}, save=()=>{}, nowMs=async()=>0, complete=async()=>null, openUi=async()=>null, openWidget=async()=>null, closeWidget=async()=>null, closeUi=async()=>null, toast=()=>{};
 let opt={mode:"float",size:"small",speak:true,watch:true};
 // choices made in the /digi pane override the plugin page's options; null means "use the option"
 let cfg={seed:null,hidden:false,rx:2,by:0,mode:null,size:null,speak:null,watch:null};
@@ -17,14 +17,16 @@ const FIGHT_SECS=14;
 let widgetOn=false, wm=freshState({}), wTick=0;
 // A surface that cannot run the cell drawing (an older desktop app, say) says so with ui.fault; from then on the
 // vector drawing stands in for it. The desktop app starts on the vector drawing unless floating was chosen.
-let clientBroken=false, onDesktop=false, paneOpen=false, pm=freshState({}), pmSeed=-1, faultNoted=false;
+let clientBroken=false, onDesktop=false, paneOpen=false, paneSvg=false, pm=freshState({}), pmSeed=-1, faultNoted=false;
+// The desktop app draws the vector version only: the cell drawing needs an element it may not have.
+function markDesktop(e){if(e&&e.surface==="desktop"&&!onDesktop){onDesktop=true;seat().catch(()=>{})}}
 const sess={turns:0,tools:0,fails:0,turnTools:0,turnFails:0,turnStart:0,byTool:{},lastPrompt:"",lastTurn:""};
 
 const rnd=a=>a[Math.floor(Math.random()*a.length)];
 const randSeed=()=>Math.floor(Math.random()*4294967296)>>>0;
 const redact=s=>String(s||"").replace(/[A-Za-z0-9_\-+/=]{24,}/g,"[redacted]").replace(/\s+/g," ").trim();
 const modeNow=()=>{
-  if(clientBroken)return "widget";
+  if(clientBroken||onDesktop)return "widget";
   if(cfg.mode==="float"||cfg.mode==="widget")return cfg.mode;
   return onDesktop?"widget":opt.mode;
 };
@@ -176,11 +178,18 @@ function svgFrame(dg,m,px){
 function widgetTick(){
   wTick=(wTick+1)%2;
   let need=false;
-  if(widgetOn&&d){advance(wm,d,.125);need=lively(wm)||wTick===0}
-  if(paneOpen&&cands.length&&(onDesktop||clientBroken)){const c=cands[ci];if(c){if(pmSeed!==c.seed){pm=freshState({});pm.seed=c.seed;pmSeed=c.seed}advance(pm,c,.125);need=need||wTick===0}}
+  const c=paneOpen&&paneSvg&&cands.length?cands[ci]:null, mineShown=!!(c&&d&&c.seed===d.seed);
+  if(d&&(widgetOn||mineShown)){advance(wm,d,.125);need=lively(wm)||wTick===0}
+  if(c&&!mineShown){if(pmSeed!==c.seed){pm=freshState({});pm.seed=c.seed;pmSeed=c.seed}advance(pm,c,.125);need=need||lively(pm)||wTick===0}
   if(need)redraw();
 }
 
+// a click on a digi you are only looking at: it talks, now and then it casts something
+function pokePreview(c){
+  if(Math.random()<.3&&c.plays&&c.plays.length){pm.queue=rnd(c.plays).slice();pm.play=null}
+  else{const b=rnd(c.bank);pm.speech={text:phrase(b).replace(/[^\x20-\x7e]/g,""),loud:b[0]==="!",t0:pm.t,done:false}}
+  redraw();
+}
 function deal(){cands=[];for(let i=0;i<8;i++){const c=makeDigi(randSeed());c.plays=buildPlays(c);cands.push(c)}ci=0}
 async function openPane(){if(!cands.length)deal();paneOpen=true;return openUi()}
 async function seat(){
@@ -202,6 +211,7 @@ export function register(on,options){
     openUi=()=>$.ui.open({id:PANE,title:"Digi",focus:true,closeOnEscape:true});
     openWidget=()=>$.ui.open({id:WIDGET,title:"Digi",placement:"widget"});
     closeWidget=()=>$.ui.close({id:WIDGET});
+    closeUi=()=>$.ui.close({id:PANE});
     toast=text=>$.ui.toast(text);
     ready=true;
     try{const saved=await $.store.get("cfg");if(saved&&typeof saved==="object")cfg=Object.assign(cfg,saved)}catch(err){}
@@ -229,13 +239,15 @@ export function register(on,options){
     }
     if(a==="size small"||a==="size large"||a==="small"||a==="large"){cfg.size=a.endsWith("large")?"large":"small";save();redraw();return {}}
     if(a==="new"){setDigi(randSeed());save();redraw();return {text:"Your digi is now "+d.name+", a "+RARITY[d.rar]+" "+d.type+" type."}}
+    if(a==="close"||(a===""&&paneOpen)){paneOpen=false;await closeUi().catch(()=>{});return {}}
     await openPane();
     return {};
   });
 
   // Floating: from a cell of no width beside the prompt, over the whole area above it. Blank parts pass the pointer on.
   on("ui.render",{component:"BesidePrompt"},async($,e,next)=>{
-    if(!d||cfg.hidden||widgetOn||modeNow()!=="float")return next(e);
+    markDesktop(e);
+    if(!d||cfg.hidden||widgetOn||e.surface==="desktop"||modeNow()!=="float")return next(e);
     const el=$.ui.resolve(e), cols=e.props.floatColumns|0, rws=e.props.floatRows|0;
     if(!el.Client||cols<16||rws<6)return next(e);
     return el.Box({width:0,height:1,children:[
@@ -250,22 +262,35 @@ export function register(on,options){
       const el=$.ui.resolve(e);
       if(!d)return next(e);
       if(!el.Svg)return el.Text({children:[d.name+" needs the desktop app for this view. Run /digi float."]});
+      markDesktop(e);
       const big=e.props.placement!=="widget";
       return el.Box({flexDirection:"column",alignItems:"center",children:[
         el.Svg({source:svgFrame(d,wm,big?320:176),alt:d.name+", your digi"+(wm.speech?", saying: "+wm.speech.text:""),width:big?320:176}),
-        el.Button({key:"poke",label:big?"Poke "+d.name:"Poke",plain:true,onPress:()=>{poke().catch(()=>{})}})
+        el.Box({flexDirection:"row",columnGap:1,children:[
+          el.Button({key:"poke",label:"Poke",onPress:()=>{poke().catch(()=>{})}}),
+          el.Button({key:"cast",label:"Cast",onPress:()=>{doMove()}}),
+          el.Button({key:"hide",label:"Hide",role:"dismiss",onPress:()=>{cfg.hidden=true;save();seat().catch(()=>{})}})
+        ]})
       ]});
     }
     if(e.requestId!==PANE)return next(e);
-    paneOpen=true;
+    paneOpen=true;markDesktop(e);
     const {Box,Text,Button,Client,Svg}=$.ui.resolve(e);
     if(!cands.length)deal();
     const c=cands[ci], mine=d&&c.seed===d.seed;
     const kids=[];
     // the preview: cells where the app runs them, the vector drawing where it doesn't
-    if(Svg&&(e.surface==="desktop"||clientBroken||!Client)){
+    paneSvg=!!(Svg&&(e.surface==="desktop"||clientBroken||!Client));
+    if(paneSvg){
       if(pmSeed!==c.seed){pm=freshState({});pm.seed=c.seed;pmSeed=c.seed}
-      kids.push(Svg({source:svgFrame(c,pm,252),alt:c.name+", "+RARITY[c.rar]+" "+c.type+" type",width:252}));
+      // your own digi is drawn from its live state, so what it says and casts shows here too
+      const st=mine?wm:pm;
+      kids.push(Svg({source:svgFrame(c,st,252),alt:c.name+", "+RARITY[c.rar]+" "+c.type+" type"+(st.speech?", saying: "+st.speech.text:""),width:252}));
+      // a plugin cannot hear clicks on the drawing itself in the desktop app, so these stand in for clicking it
+      kids.push(Box({flexDirection:"row",columnGap:1,children:[
+        Button({key:"poke",label:"Poke",hotkey:"o",onPress:()=>{if(mine)poke().catch(()=>{});else pokePreview(c)}}),
+        Button({key:"cast",label:"Cast a move",hotkey:"c",onPress:()=>{if(mine)doMove();else if(c.plays.length){pm.queue=rnd(c.plays).slice();pm.play=null;redraw()}}})
+      ]}));
     }else if(Client&&!clientBroken){
       kids.push(Box({width:36,height:13,children:[Client({key:"preview",module:"./sprite.js",width:36,height:13,props:{seed:c.seed,size:"small",mode:"preview"}})]}));
     }
@@ -284,14 +309,16 @@ export function register(on,options){
       Text({children:[" "]}),
       Text({bold:true,children:["Settings"]}),
       Box({flexDirection:"row",columnGap:1,children:[
-        Button({key:"view",label:"View: "+(modeNow()==="widget"?"widget":"floating"),onPress:()=>{cfg.mode=modeNow()==="widget"?"float":"widget";if(cfg.mode==="float")clientBroken=false;save();seat().catch(()=>{});redraw()}}),
+        onDesktop?Text({dimColor:true,children:["View: widget (floating needs the terminal)"]}):Button({key:"view",label:"View: "+(modeNow()==="widget"?"widget":"floating"),onPress:()=>{cfg.mode=modeNow()==="widget"?"float":"widget";if(cfg.mode==="float")clientBroken=false;save();seat().catch(()=>{});redraw()}}),
         Button({key:"size",label:"Size: "+sizeNow(),onPress:()=>{cfg.size=sizeNow()==="small"?"large":"small";save();redraw()}}),
         flip("shown","Shown",!cfg.hidden,()=>{cfg.hidden=!cfg.hidden})
       ]}),
       Box({flexDirection:"row",columnGap:1,children:[
         flip("speak","Claude writes its lines",speakNow(),()=>{cfg.speak=!speakNow()}),
         flip("watch","Comments on this session",watchNow(),()=>{cfg.watch=!watchNow()})
-      ]})
+      ]}),
+      Text({children:[" "]}),
+      Button({key:"close",label:"Close",hotkey:"x",role:"dismiss",onPress:()=>{paneOpen=false;closeUi().catch(()=>{})}})
     );
     return Box({flexDirection:"column",children:kids});
   });

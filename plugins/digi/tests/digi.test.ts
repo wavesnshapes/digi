@@ -23,19 +23,17 @@ function world(on: any, saved: Record<string, unknown> = {}, surfaces: string[] 
 }
 
 describe('digi', () => {
-  for (const surface of ['terminal', 'desktop'] as const) {
-    test('floats beside the prompt on ' + surface, async ($, on) => {
-      world(on)
-      await $.session.start({ cwd: '/work' } as never)
-      const ui = await $.ui.mount({ plugin: 'digi', surface, component: 'BesidePrompt', props: CELL as never })
-      await ui.resize({ columns: 100, rows: 30, in: 'digi' })
-      await ui.advance(300)
-      const drawn = JSON.stringify(await ui.drawn({ in: 'digi' }))
-      expect(drawn).toContain('absolute')
-      expect(drawn.length).toBeGreaterThan(2000)
-      await ui.unmount()
-    })
-  }
+  test('floats beside the prompt in the terminal', async ($, on) => {
+    world(on)
+    await $.session.start({ cwd: '/work' } as never)
+    const ui = await $.ui.mount({ plugin: 'digi', surface: 'terminal', component: 'BesidePrompt', props: CELL as never })
+    await ui.resize({ columns: 100, rows: 30, in: 'digi' })
+    await ui.advance(300)
+    const drawn = JSON.stringify(await ui.drawn({ in: 'digi' }))
+    expect(drawn).toContain('absolute')
+    expect(drawn.length).toBeGreaterThan(2000)
+    await ui.unmount()
+  })
 
   test('a drag moves it and the place is saved', async ($, on) => {
     const { kept } = world(on)
@@ -86,18 +84,18 @@ describe('digi', () => {
     await $.command.run({ command: 'digi', args: '' } as never)
     const ui = await $.ui.mount({ plugin: 'digi', surface: 'desktop', component: 'Pane', requestId: 'digi', props: PANE as never })
     expect(JSON.stringify(await ui.drawn())).toContain('<svg')
-    await ui.press({ key: 'view' })
+    await ui.press({ key: 'poke' })
+    await ui.press({ key: 'cast' })
     await ui.press({ key: 'size' })
     expect(await ui.find({ key: 'speak' })).toBeDefined()
+    await ui.press({ key: 'close' })
     await ui.unmount()
   })
 
-  test('the desktop app starts on the widget, and floats when asked', async ($, on) => {
-    const { opened, kept } = world(on, {}, ['desktop'])
+  test('the desktop app starts on the widget', async ($, on) => {
+    const { opened } = world(on, {}, ['desktop'])
     await $.session.start({ cwd: '/work' } as never)
     expect(JSON.stringify(opened)).toContain('widget')
-    await $.command.run({ command: 'digi', args: 'float' } as never)
-    expect(kept.cfg.mode).toBe('float')
   })
 
   test('the widget draws a vector digi on the desktop app', async ($, on) => {

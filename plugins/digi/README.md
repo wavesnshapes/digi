@@ -30,7 +30,7 @@ Change them in the `/digi` pane, under **Settings**. The same settings are also 
 
 | Setting | What it does |
 | :- | :- |
-| View | `float` or `widget`. The desktop app starts on `widget`; run `/digi float` to try floating there |
+| View | `float` or `widget`. The desktop app always uses `widget`: floating and dragging need the terminal |
 | Size when floating | `small` or `large` |
 | Claude writes its lines | Off: stock phrases only |
 | Comments on your session | Off: its lines never mention your session |
