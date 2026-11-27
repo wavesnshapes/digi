@@ -1,6 +1,6 @@
 {
   "name": "digi",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "A digi companion that floats in your Claude Code session, reacts to how it is going and talks back",
   "author": {
     "name": "wavesnshapes",
