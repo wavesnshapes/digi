@@ -1,0 +1,31 @@
+{
+  "name": "opencode-digi",
+  "version": "0.2.0",
+  "description": "digi: a small TV-headed companion that floats inside OpenCode, in the desktop app and in the terminal",
+  "license": "MIT",
+  "author": "wavesnshapes",
+  "homepage": "https://digi.directory",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/wavesnshapes/digi.git"
+  },
+  "keywords": [
+    "opencode",
+    "opencode-plugin",
+    "desktop",
+    "tui",
+    "companion",
+    "digi"
+  ],
+  "type": "module",
+  "exports": {
+    ".": "./opencode/index.ts",
+    "./tui": "./opencode/tui.ts",
+    "./gui-experimental": "./opencode/gui-experimental.cjs"
+  },
+  "files": [
+    "opencode",
+    "LICENSE",
+    "README.md"
+  ]
+}
