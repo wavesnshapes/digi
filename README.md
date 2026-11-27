@@ -1,4 +1,9 @@
+opencode
+https://github.com/user-attachments/assets/77374ed4-decf-4654-8a35-1c78de360fbe
+this digi has the "terminally online" character trait which is why it constantly says meme bro things. 
 
+
+claude code via artifact/desktop app
 https://github.com/user-attachments/assets/10fa8b88-dda6-4955-adbf-f6bc92ab64ab
 
 # digi
