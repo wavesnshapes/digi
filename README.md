@@ -1,3 +1,6 @@
+
+https://github.com/user-attachments/assets/10fa8b88-dda6-4955-adbf-f6bc92ab64ab
+
 # digi
 
 A small TV-headed mascot for Claude from [digi.directory](https://digi.directory). Think tamagotchi: it floats on your screen next to Claude, talks on its face, casts its moves, and fights back if you click it too much.
