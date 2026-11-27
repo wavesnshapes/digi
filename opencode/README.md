@@ -28,6 +28,8 @@ The digi is drawn pixel for pixel, the same as in the [desktop app](../README.md
 
 - Only its body takes the mouse. The empty corners of its box let clicks through to OpenCode, and clicking it does not take the cursor out of the prompt.
 - Type `/digi` in the prompt, or click the gear, for the generator: generate digis one at a time with the arrival animation, a history, the full sheet (stats, moves, skills, combos, looks and rarity), and "Make this my digi". Settings are at the bottom: size from 50 to 400 pixels, and whether the model writes its lines.
+- It sits in the bottom right corner, and stays in that corner when the window changes size, until you drag it somewhere else.
+- **Let it read my open chat** in settings is off by default. Turn it on and it can talk about what you are doing, and it speaks up when a turn finishes. See "What it reads and sends".
 - **Digi: hide or show** in the command palette puts it away and brings it back.
 - Escape, Done or a click outside closes the generator.
 
@@ -51,7 +53,11 @@ The terminal and the desktop app each keep their own digi and settings.
 
 ## What it reads and sends
 
-Everything runs inside your OpenCode. With the model writing its lines, a short request goes to the model your session is set to, through OpenCode itself, each time the digi speaks in its own words. That costs whatever that model costs you, so turn it off in settings to keep it to stock phrases. In the terminal, with session comments on, that request also holds counts from your session: turns, tool calls, failures and which tools were used most. It never holds your prompts or file contents. The plugin makes no network requests of its own and saves only your digi, history and settings.
+Everything runs inside your OpenCode. With the model writing its lines, a short request goes to the model your session is set to, through OpenCode itself, each time the digi speaks in its own words. That costs whatever that model costs you, so turn it off in settings to keep it to stock phrases. In the terminal, with session comments on, that request also holds counts from your session: turns, tool calls, failures and which tools were used most. It never holds your prompts or file contents.
+
+In the desktop app, with "Let it read my open chat" on, that request also holds the last few messages of the chat you have open: what you typed and what the AI answered, each cut to a couple of hundred characters, with long codes such as keys blanked out, plus how many tools a reply used and how many failed. Tool output and file contents are not included. It goes to the same model your chat already goes to, and nothing is stored. With the setting off, which is the default, the digi knows nothing about your chat.
+
+The plugin makes no network requests of its own and saves only your digi, history and settings.
 
 ## Where it works
 
