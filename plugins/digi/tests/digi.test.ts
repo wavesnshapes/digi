@@ -80,6 +80,26 @@ describe('digi', () => {
     await ui.unmount()
   })
 
+  test('the pane draws the preview as a vector drawing in the desktop app', async ($, on) => {
+    world(on, {}, ['desktop'])
+    await $.session.start({ cwd: '/work' } as never)
+    await $.command.run({ command: 'digi', args: '' } as never)
+    const ui = await $.ui.mount({ plugin: 'digi', surface: 'desktop', component: 'Pane', requestId: 'digi', props: PANE as never })
+    expect(JSON.stringify(await ui.drawn())).toContain('<svg')
+    await ui.press({ key: 'view' })
+    await ui.press({ key: 'size' })
+    expect(await ui.find({ key: 'speak' })).toBeDefined()
+    await ui.unmount()
+  })
+
+  test('the desktop app starts on the widget, and floats when asked', async ($, on) => {
+    const { opened, kept } = world(on, {}, ['desktop'])
+    await $.session.start({ cwd: '/work' } as never)
+    expect(JSON.stringify(opened)).toContain('widget')
+    await $.command.run({ command: 'digi', args: 'float' } as never)
+    expect(kept.cfg.mode).toBe('float')
+  })
+
   test('the widget draws a vector digi on the desktop app', async ($, on) => {
     const { opened } = world(on, { mode: 'widget' }, ['desktop'])
     await $.session.start({ cwd: '/work' } as never)

@@ -26,11 +26,11 @@ To get a newer version later, run `/plugin marketplace update digi-directory`.
 
 ## Settings
 
-Settings are on the plugin's own page: run `/plugin`, open **Installed**, and pick **digi**.
+Change them in the `/digi` pane, under **Settings**. The same settings are also on the plugin's own page in the terminal: run `/plugin`, open **Installed**, pick **digi**, then **Configure options**. A choice made in the pane wins.
 
 | Setting | What it does |
 | :- | :- |
-| View | `float` or `widget` |
+| View | `float` or `widget`. The desktop app starts on `widget`; run `/digi float` to try floating there |
 | Size when floating | `small` or `large` |
 | Claude writes its lines | Off: stock phrases only |
 | Comments on your session | Off: its lines never mention your session |
