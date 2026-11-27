@@ -668,19 +668,30 @@ const FIGHT=["stop poking me","you want some of this","i have moves and i will u
 // The mods API is only ever spelled out inside a hook, so the first hook fills these in for everything else to call.
 let ready=false, redraw=()=>{}, save=()=>{}, nowMs=async()=>0, complete=async()=>null, openUi=async()=>null, openWidget=async()=>null, closeWidget=async()=>null, toast=()=>{};
 let opt={mode:"float",size:"small",speak:true,watch:true};
-let cfg={seed:null,hidden:false,rx:2,by:0,mode:null};
+// choices made in the /digi pane override the plugin page's options; null means "use the option"
+let cfg={seed:null,hidden:false,rx:2,by:0,mode:null,size:null,speak:null,watch:null};
 let d=null, say={id:0,text:"",loud:false}, play={id:0,i:-1}, think=false;
 let lastLines=[], lastModelAt=0, nextTalk=0, nextMove=0, busy=false;
 let cands=[], ci=0, clicks=[], fightUntil=0, nextStrike=0, lastHover=0, fight={id:0,secs:0};
 const FIGHT_SECS=14;
 let widgetOn=false, wm=freshState({}), wTick=0;
+// A surface that cannot run the cell drawing (an older desktop app, say) says so with ui.fault; from then on the
+// vector drawing stands in for it. The desktop app starts on the vector drawing unless floating was chosen.
+let clientBroken=false, onDesktop=false, paneOpen=false, pm=freshState({}), pmSeed=-1, faultNoted=false;
 const sess={turns:0,tools:0,fails:0,turnTools:0,turnFails:0,turnStart:0,byTool:{},lastPrompt:"",lastTurn:""};
 
 const rnd=a=>a[Math.floor(Math.random()*a.length)];
 const randSeed=()=>Math.floor(Math.random()*4294967296)>>>0;
 const redact=s=>String(s||"").replace(/[A-Za-z0-9_\-+/=]{24,}/g,"[redacted]").replace(/\s+/g," ").trim();
-const modeNow=()=>cfg.mode==="float"||cfg.mode==="widget"?cfg.mode:opt.mode;
-const spriteProps=()=>({seed:cfg.seed,size:opt.size,rx:cfg.rx,by:cfg.by,say,play,think,fight});
+const modeNow=()=>{
+  if(clientBroken)return "widget";
+  if(cfg.mode==="float"||cfg.mode==="widget")return cfg.mode;
+  return onDesktop?"widget":opt.mode;
+};
+const sizeNow=()=>cfg.size==="large"||cfg.size==="small"?cfg.size:opt.size;
+const speakNow=()=>typeof cfg.speak==="boolean"?cfg.speak:opt.speak;
+const watchNow=()=>typeof cfg.watch==="boolean"?cfg.watch:opt.watch;
+const spriteProps=()=>({seed:cfg.seed,size:sizeNow(),rx:cfg.rx,by:cfg.by,say,play,think,fight});
 function setFight(now,on){
   fightUntil=on?now+FIGHT_SECS*1000:0;nextStrike=now+2400;
   fight={id:fight.id+1,secs:on?FIGHT_SECS:0};
@@ -707,7 +718,7 @@ function doMove(){
 
 function digest(kind){
   const L=["WORLD CONTEXT","Local time: "+new Date().toLocaleString("en-US",{weekday:"long",hour:"numeric",minute:"2-digit"})+"."];
-  if(opt.watch){
+  if(watchNow()){
     L.push("","YOUR OWNER'S CLAUDE CODE SESSION, which you watch from beside the prompt (they are working with Claude, the AI):");
     L.push(`So far: ${sess.turns} turns, ${sess.tools} tool calls, ${sess.fails} of them failed.`);
     const top=Object.entries(sess.byTool).sort((a,b)=>b[1]-a[1]).slice(0,4).map(x=>x[0]+" x"+x[1]).join(", ");
@@ -752,12 +763,12 @@ async function poke(){
   if(clicks.length>=6){
     setFight(now,true);clicks=[];
     doMove();
-    if(opt.speak&&now-lastModelAt>4000)modelLine("fight");else speak(rnd(FIGHT).toUpperCase(),true);
+    if(speakNow()&&now-lastModelAt>4000)modelLine("fight");else speak(rnd(FIGHT).toUpperCase(),true);
     return;
   }
   if(clicks.length>=4){const y=TEND[d.tend[0]]||MEME;speak(String((y&&y.y)||"quit poking me").toUpperCase(),true);return}
   if(Math.random()<.22){doMove();return}
-  if(opt.speak&&now-lastModelAt>6000)modelLine("poke");else stock();
+  if(speakNow()&&now-lastModelAt>6000)modelLine("poke");else stock();
 }
 async function hovered(){
   if(!d||fightUntil>0||busy)return;
@@ -777,7 +788,7 @@ async function beat(){
   if(!nextTalk){nextTalk=now+20000;nextMove=now+60000+Math.random()*60000;return}
   if(now>nextTalk){
     nextTalk=now+70000+Math.random()*90000;
-    if(opt.speak&&sess.turns>0&&now-lastModelAt>300000&&Math.random()<.3)modelLine("idle");else stock();
+    if(speakNow()&&sess.turns>0&&now-lastModelAt>300000&&Math.random()<.3)modelLine("idle");else stock();
   }else if(now>nextMove){nextMove=now+120000+Math.random()*150000;doMove()}
 }
 
@@ -823,14 +834,15 @@ function svgFrame(dg,m,px){
     `</svg>`;
 }
 function widgetTick(){
-  if(!widgetOn||!d)return;
-  advance(wm,d,.125);
   wTick=(wTick+1)%2;
-  if(lively(wm)||wTick===0)redraw();
+  let need=false;
+  if(widgetOn&&d){advance(wm,d,.125);need=lively(wm)||wTick===0}
+  if(paneOpen&&cands.length&&(onDesktop||clientBroken)){const c=cands[ci];if(c){if(pmSeed!==c.seed){pm=freshState({});pm.seed=c.seed;pmSeed=c.seed}advance(pm,c,.125);need=need||wTick===0}}
+  if(need)redraw();
 }
 
-function deal(){cands=[];for(let i=0;i<8;i++)cands.push(makeDigi(randSeed()));ci=0}
-async function openPane(){if(!cands.length)deal();return openUi()}
+function deal(){cands=[];for(let i=0;i<8;i++){const c=makeDigi(randSeed());c.plays=buildPlays(c);cands.push(c)}ci=0}
+async function openPane(){if(!cands.length)deal();paneOpen=true;return openUi()}
 async function seat(){
   // the widget is the desktop app's; anywhere else, and if it is not given a seat, the digi floats
   if(cfg.hidden||modeNow()!=="widget"){if(widgetOn){widgetOn=false;closeWidget().catch(()=>{})}redraw();return}
@@ -859,18 +871,23 @@ export function register(on,options){
     $.clock.every(125,()=>{widgetTick()});
     try{await $.command.register({name:"digi",description:"Your digi companion: pick one, make it talk, switch between floating and the widget",argumentHint:"[pick|talk|move|new|float|widget|hide|show]",immediate:true})}catch(err){}
     if(hatched)$.ui.toast(d.name+" hatched in your session. Run /digi to pick a different one.");
-    let desktop=false;
-    try{desktop=JSON.stringify(await $.session.surfaces()).includes("desktop")}catch(err){}
-    if(desktop)seat().catch(()=>{});
+    try{onDesktop=JSON.stringify(await $.session.surfaces()).includes("desktop")}catch(err){}
+    if(onDesktop)seat().catch(()=>{});
     return next(e);
   });
 
   on("command.run",{command:"digi"},async($,e)=>{
     const a=String(e.args||"").trim().toLowerCase();
-    if(a==="talk"){if(opt.speak)modelLine("poke");else stock();return {}}
+    if(a==="talk"){if(speakNow())modelLine("poke");else stock();return {}}
     if(a==="move"){doMove();return {}}
     if(a==="hide"||a==="show"){cfg.hidden=a==="hide";save();await seat();return {}}
-    if(a==="float"||a==="widget"){cfg.mode=a;save();await seat();return {text:a==="widget"?"Your digi is in the corner widget. It only exists in the desktop app.":"Your digi is floating. Drag it anywhere."}}
+    if(a==="float"||a==="widget"){
+      cfg.mode=a;save();
+      if(a==="float")clientBroken=false;
+      await seat();
+      return {text:a==="widget"?"Your digi is in the widget view.":"Your digi is floating above the prompt. Drag it anywhere. If nothing shows, your app can't draw the floating view yet: run /digi widget."};
+    }
+    if(a==="size small"||a==="size large"||a==="small"||a==="large"){cfg.size=a.endsWith("large")?"large":"small";save();redraw();return {}}
     if(a==="new"){setDigi(randSeed());save();redraw();return {text:"Your digi is now "+d.name+", a "+RARITY[d.rar]+" "+d.type+" type."}}
     await openPane();
     return {};
@@ -878,7 +895,7 @@ export function register(on,options){
 
   // Floating: from a cell of no width beside the prompt, over the whole area above it. Blank parts pass the pointer on.
   on("ui.render",{component:"BesidePrompt"},async($,e,next)=>{
-    if(!d||cfg.hidden||widgetOn)return next(e);
+    if(!d||cfg.hidden||widgetOn||modeNow()!=="float")return next(e);
     const el=$.ui.resolve(e), cols=e.props.floatColumns|0, rws=e.props.floatRows|0;
     if(!el.Client||cols<16||rws<6)return next(e);
     return el.Box({width:0,height:1,children:[
@@ -900,11 +917,19 @@ export function register(on,options){
       ]});
     }
     if(e.requestId!==PANE)return next(e);
-    const {Box,Text,Button,Client}=$.ui.resolve(e);
+    paneOpen=true;
+    const {Box,Text,Button,Client,Svg}=$.ui.resolve(e);
     if(!cands.length)deal();
     const c=cands[ci], mine=d&&c.seed===d.seed;
     const kids=[];
-    if(Client)kids.push(Box({mono:true,width:36,height:13,children:[Client({key:"preview",module:"./sprite.js",width:36,height:13,props:{seed:c.seed,size:"small",mode:"preview"}})]}));
+    // the preview: cells where the app runs them, the vector drawing where it doesn't
+    if(Svg&&(e.surface==="desktop"||clientBroken||!Client)){
+      if(pmSeed!==c.seed){pm=freshState({});pm.seed=c.seed;pmSeed=c.seed}
+      kids.push(Svg({source:svgFrame(c,pm,252),alt:c.name+", "+RARITY[c.rar]+" "+c.type+" type",width:252}));
+    }else if(Client&&!clientBroken){
+      kids.push(Box({width:36,height:13,children:[Client({key:"preview",module:"./sprite.js",width:36,height:13,props:{seed:c.seed,size:"small",mode:"preview"}})]}));
+    }
+    const flip=(key,label,on2,fn)=>Button({key,label:label+": "+(on2?"on":"off"),onPress:()=>{fn();save();seat().catch(()=>{});redraw()}});
     kids.push(
       Text({bold:true,children:[c.name+"  "+STARS[c.rar]]}),
       Text({children:[RARITY[c.rar]+" "+c.type+" type, "+c.plan+" frame"]}),
@@ -913,16 +938,35 @@ export function register(on,options){
       Box({flexDirection:"row",columnGap:1,children:[
         Button({key:"prev",label:"Prev",hotkey:"p",onPress:()=>{ci=(ci+cands.length-1)%cands.length;redraw()}}),
         Button({key:"next",label:"Next",hotkey:"n",onPress:()=>{ci=(ci+1)%cands.length;redraw()}}),
-        Button({key:"keep",label:"Make this my digi",hotkey:"k",onPress:()=>{setDigi(c.seed);save();redraw();toast(d.name+" is your digi now.")}}),
+        Button({key:"keep",label:mine?"This is your digi":"Make this my digi",hotkey:"k",onPress:()=>{setDigi(c.seed);save();redraw();toast(d.name+" is your digi now.")}}),
         Button({key:"roll",label:"Roll 8 more",hotkey:"r",onPress:()=>{deal();redraw()}})
       ]}),
       Text({children:[" "]}),
-      Text({dimColor:true,wrap:"wrap",children:["Now: "+(widgetOn?"corner widget":"floating")+", "+opt.size+", Claude's voice "+(opt.speak?"on":"off")+", session comments "+(opt.watch?"on":"off")+". Change these on the plugin's own page: run /plugin, open Installed, pick digi."]})
+      Text({bold:true,children:["Settings"]}),
+      Box({flexDirection:"row",columnGap:1,children:[
+        Button({key:"view",label:"View: "+(modeNow()==="widget"?"widget":"floating"),onPress:()=>{cfg.mode=modeNow()==="widget"?"float":"widget";if(cfg.mode==="float")clientBroken=false;save();seat().catch(()=>{});redraw()}}),
+        Button({key:"size",label:"Size: "+sizeNow(),onPress:()=>{cfg.size=sizeNow()==="small"?"large":"small";save();redraw()}}),
+        flip("shown","Shown",!cfg.hidden,()=>{cfg.hidden=!cfg.hidden})
+      ]}),
+      Box({flexDirection:"row",columnGap:1,children:[
+        flip("speak","Claude writes its lines",speakNow(),()=>{cfg.speak=!speakNow()}),
+        flip("watch","Comments on this session",watchNow(),()=>{cfg.watch=!watchNow()})
+      ]})
     );
     return Box({flexDirection:"column",children:kids});
   });
 
-  on("ui.close",async($,e,next)=>{if(e.id===WIDGET&&e.origin&&e.origin.kind!=="plugin"){widgetOn=false;redraw()}return next(e)}).catch(($,e,next)=>next(e));
+  // the cell drawing failed on this surface: the vector drawing takes over
+  on("ui.fault",async($,e,next)=>{
+    if(e.element==="digi"||e.element==="preview"){
+      clientBroken=true;
+      if(!faultNoted){faultNoted=true;toast("This app can't run the floating digi yet, so it moved to the widget view.")}
+      seat().catch(()=>{});redraw();
+    }
+    return next(e);
+  }).catch(($,e,next)=>next(e));
+
+  on("ui.close",async($,e,next)=>{if(e.id===PANE)paneOpen=false;if(e.id===WIDGET&&e.origin&&e.origin.kind!=="plugin"){widgetOn=false;redraw()}return next(e)}).catch(($,e,next)=>next(e));
 
   on("ui.message",async($,e,next)=>{
     const m=e.data&&typeof e.data==="object"?e.data:{};
@@ -950,7 +994,7 @@ export function register(on,options){
       sess.turns++;
       sess.lastTurn=`${sess.turnTools} tool calls, ${sess.turnFails} failed, about ${secs} seconds`+(e.reason&&e.reason!=="answer"?", ended as "+e.reason:"")+".";
       const dramatic=sess.turnTools>=8||sess.turnFails>=2||secs>120||(e.reason&&e.reason!=="answer");
-      if(d&&!cfg.hidden&&fightUntil===0&&opt.speak&&opt.watch&&now-lastModelAt>90000&&(dramatic||Math.random()<.2))modelLine("turn");
+      if(d&&!cfg.hidden&&fightUntil===0&&speakNow()&&watchNow()&&now-lastModelAt>90000&&(dramatic||Math.random()<.2))modelLine("turn");
     }catch(err){}
     return r;
   });
