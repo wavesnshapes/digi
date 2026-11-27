@@ -1,25 +1,27 @@
 # digi
 
-A companion for Claude Code from [digi.directory](https://digi.directory): a small TV-headed creature that floats in your session, talks on its face, reacts to how your work is going, and fights back if you click it too much.
+A small TV-headed mascot for Claude from [digi.directory](https://digi.directory). Think tamagotchi: it floats on your screen next to Claude, talks on its face, casts its moves, and fights back if you click it too much.
 
-This repository is a plugin marketplace with one plugin, `digi`. Its README has the full details: [plugins/digi/README.md](plugins/digi/README.md).
+## Get it: the desktop app
 
-## Install
+**[Open Digi companion](https://claude.ai/artifact/EwEJPtBhnkQ76raMpPDSjb)** in the Claude desktop app and press **Install as app**.
 
-In Claude Code (the terminal, or the Code tab of the Claude desktop app), run:
+Generate digis one at a time, keep the one you like, and it floats on your screen. Drag it wherever it works for you. It runs on your own computer and your own Claude account.
+
+## Status of the plugin
+
+I first built this as a Claude Code plugin, and that code is still in this repo. Right now I can't make it work the way I want as a plugin or extension: the Code tab of the Claude desktop app doesn't yet give a plugin a place to float a draggable digi. I've asked the Anthropic team for help. Until that changes, the app above is the way to get a digi.
+
+The plugin does still install, and floating should work in Claude Code's fullscreen terminal. In the desktop app it only shows in its own pane.
 
     /plugin marketplace add wavesnshapes/digi
     /plugin install digi@digi-directory
 
-On recent versions of Claude Code, one line does both:
-
-    /plugin install digi --marketplace wavesnshapes/digi
-
-To get a newer version later, run `/plugin marketplace update digi-directory`.
+More on the plugin: [plugins/digi/README.md](plugins/digi/README.md).
 
 ## Source
 
-The two code files in `plugins/digi/hooks` are generated. Edit the files in `src`, then run `node build.mjs`.
+The plugin's two code files in `plugins/digi/hooks` are generated. Edit the files in `src`, then run `node build.mjs`.
 
 ## License
 
