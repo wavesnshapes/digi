@@ -13,7 +13,7 @@ Generate digis one at a time, keep the one you like, and it floats on your scree
 
 ## Or: in OpenCode
 
-Use [OpenCode](https://opencode.ai)? The digi floats right inside its terminal, where you can drag it around:
+Use [OpenCode](https://opencode.ai)? The digi floats right inside it, in the desktop app and in the terminal, and you can drag it around:
 
     opencode plugin add git+https://github.com/wavesnshapes/digi.git
 
@@ -32,7 +32,7 @@ More on the plugin: [plugins/digi/README.md](plugins/digi/README.md).
 
 ## Source
 
-The code in `plugins/digi/hooks` and `opencode` is generated. Edit the files in `src`, then run `node build.mjs`.
+The code in `plugins/digi/hooks` and `opencode` is generated. Edit the files in `src`, then run `node build.mjs`. `src/app.html` is the desktop app itself, and the OpenCode Desktop part is built from it.
 
 ## License
 
